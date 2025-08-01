@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.o`
@@ -205,6 +205,10 @@ vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper win
 -- vim.keymap.set("n", "<C-S-j>", "<C-w>J", { desc = "Move window to the lower" })
 -- vim.keymap.set("n", "<C-S-k>", "<C-w>K", { desc = "Move window to the upper" })
 
+vim.keymap.set({ 'n', 'v' }, '<Leader>-', function()
+  vim.cmd 'vsplit | wincmd r'
+  require('oil').open()
+end)
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
@@ -218,6 +222,32 @@ vim.api.nvim_create_autocmd('TextYankPost', {
     vim.hl.on_yank()
   end,
 })
+
+vim.api.nvim_create_autocmd('VimEnter', {
+  callback = function()
+    local args = vim.fn.argv()
+    if #args == 1 then
+      local fname = args[1]
+      local ext = fname:match '^.+(%..+)$'
+      if ext == '.js' or ext == '.jsx' or ext == '.py' then
+        -- Defer tree open slightly to avoid split conflict
+        vim.defer_fn(function()
+          require('nvim-tree.api').tree.open()
+        end, 100) -- Delay in milliseconds (adjust if needed)
+      end
+    end
+  end,
+})
+-- vim.api.nvim_create_autocmd('BufEnter', {
+--   callback = function()
+--     local ft = vim.bo.filetype
+--     local valid_types = { javascript = true, javascriptreact = true, python = true }
+--
+--     if valid_types[ft] then
+--       require('nvim-tree.api').tree.open()
+--     end
+--   end,
+-- })
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -377,9 +407,56 @@ require('lazy').setup({
         end,
       },
       { 'nvim-telescope/telescope-ui-select.nvim' },
-
-      -- Useful for getting pretty icons, but requires a Nerd Font.
-      { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
+      {
+        'nvim-tree/nvim-tree.lua',
+        opts = {
+          sort = {
+            sorter = 'case_sensitive',
+          },
+          view = {
+            width = 30,
+            side = 'left',
+          },
+          renderer = {
+            group_empty = true,
+          },
+          filters = {
+            dotfiles = true,
+          },
+        },
+      },
+      {
+        'stevearc/conform.nvim',
+        opts = {
+          formatters_by_ft = {
+            lua = { 'stylua' },
+            -- Conform will run multiple formatters sequentially
+            python = { 'isort', 'black' },
+            -- You can customize some of the format options for the filetype (:help conform.format)
+            rust = { 'rustfmt', lsp_format = 'fallback' },
+            -- Conform will run the first available formatter
+            javascript = { 'prettierd', 'prettier', stop_after_first = true },
+            javascriptreact = { 'prettierd', 'prettier', stop_after_first = true },
+          },
+        },
+      },
+      {
+        'romgrk/barbar.nvim',
+        dependencies = {
+          'lewis6991/gitsigns.nvim', -- OPTIONAL: for git status
+          'nvim-tree/nvim-web-devicons', -- OPTIONAL: for file icons
+        },
+        init = function()
+          vim.g.barbar_auto_setup = false
+        end,
+        opts = {
+          -- lazy.nvim will automatically call setup for you. put your options here, anything missing will use the default:
+          -- animation = true,
+          -- insert_at_start = true,
+          -- …etc.
+        },
+        version = '^1.0.0', -- optional: only update when a new 1.x version is released
+      },
     },
     config = function()
       -- Telescope is a fuzzy finder that comes with a lot of different things that
@@ -886,11 +963,6 @@ require('lazy').setup({
     priority = 1000, -- Make sure to load this before all the other start plugins.
     config = function()
       ---@diagnostic disable-next-line: missing-fields
-      require('neogotham').setup {
-        styles = {
-          comments = { italic = false }, -- Disable italics in comments
-        },
-      }
 
       -- Load the colorscheme here.
       -- Like many other themes, this one has different styles, and you could load
@@ -899,7 +971,6 @@ require('lazy').setup({
       vim.cmd.colorscheme 'neogotham'
     end,
   },
-
   -- Highlight todo, notes, etc in comments
   { 'folke/todo-comments.nvim', event = 'VimEnter', dependencies = { 'nvim-lua/plenary.nvim' }, opts = { signs = false } },
 
@@ -964,6 +1035,17 @@ require('lazy').setup({
     --    - Incremental selection: Included, see `:help nvim-treesitter-incremental-selection-mod`
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
+  },
+  {
+    'stevearc/oil.nvim',
+    ---@module 'oil'
+    ---@type oil.SetupOpts
+    opts = {},
+    -- Optional dependencies
+    dependencies = { { 'echasnovski/mini.icons', opts = {} } },
+    -- dependencies = { "nvim-tree/nvim-web-devicons" }, -- use if you prefer nvim-web-devicons
+    -- Lazy loading is not recommended because it is very tricky to make it work correctly in all situations.
+    lazy = false,
   },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
